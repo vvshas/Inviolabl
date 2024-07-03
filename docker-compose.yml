@@ -1,0 +1,87 @@
+version: "3.9" # Updated to the latest stable version for better features and performance
+
+services:
+  nginx:
+    image: nginx:stable-alpine # Ensure this is the latest stable version
+    restart: unless-stopped
+    container_name: ${PROJECT_SLUG}_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - internal
+    volumes:
+      - ./backend:/app/backend:ro # Read-only for improved security
+      - ./conf/nginx/:/etc/nginx:ro
+      - ./logs/nginx/:/var/log/nginx
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - backend
+
+  backend:
+    env_file:
+      - .env
+    container_name: ${PROJECT_SLUG}_backend
+    restart: unless-stopped
+    build: ./backend/
+    ports:
+      - "3001:3001"
+    networks:
+      - internal
+    environment:
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: postgres
+      DATABASE_NAME: ${DB_DATABASE}
+      DATABASE_USERNAME: ${DB_USERNAME}
+      DATABASE_PORT: ${DB_PORT}
+      DATABASE_PASSWORD: ${DB_PASSWORD}
+      NODE_ENV: ${NODE_ENV}
+    depends_on:
+      - postgres
+    # Optional: Define resource limits
+    # resources:
+    #   limits:
+    #     cpus: '0.5'
+    #     memory: 50M
+
+  frontend:
+    env_file:
+      - .env
+    container_name: ${PROJECT_SLUG}_frontend
+    restart: unless-stopped
+    build: ./frontend/
+    ports:
+      - "3000:3000"
+    networks:
+      - internal
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:12-alpine # Updated to a newer version, ensure compatibility
+    container_name: ${PROJECT_SLUG}_postgres
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    # Optional: Define resource limits
+    # resources:
+    #   limits:
+    #     cpus: '1.0'
+    #     memory: 1G
+
+volumes:
+  postgres:
+    # driver: local  # Uncomment and specify if needed
+
+networks:
+  internal:
+    name: ${PROJECT_SLUG}_internal
+    driver: bridge
+# Optional: Add health checks for services where applicable
